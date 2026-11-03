@@ -43,6 +43,11 @@ let recorder = null;
 let recordStream = null;
 let recordChunks = [];
 let serverWhisper = false;
+let preferServer = false;
+let browserListenDone = false;
+let recognitionError = "";
+let abandonRecognition = false;
+let iosRestarts = 0;
 
 function isIOS() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -53,15 +58,19 @@ function chosenMode() {
   return inputSelect.value || "auto";
 }
 
+function voiceFallback() {
+  if (serverWhisper && window.isSecureContext && navigator.mediaDevices) return "server";
+  return "typed";
+}
+
 function effectiveMode() {
   const choice = chosenMode();
   if (choice === "typed") return "typed";
-  if (choice === "browser") return SpeechRecognition ? "browser" : "typed";
+  if (choice === "browser") return SpeechRecognition ? "browser" : voiceFallback();
   if (choice === "server") return serverWhisper ? "server" : "typed";
-  if (isIOS()) return serverWhisper ? "server" : "typed";
+  if (preferServer && serverWhisper && window.isSecureContext) return "server";
   if (SpeechRecognition && window.isSecureContext) return "browser";
-  if (serverWhisper && navigator.mediaDevices) return "server";
-  return "typed";
+  return voiceFallback();
 }
 
 function supportLine() {
@@ -70,12 +79,14 @@ function supportLine() {
   ui.ptt.disabled = mode === "typed";
   if (!secure && mode !== "browser") {
     ui.support.textContent = "The microphone on an iPhone needs HTTPS, not a plain http:// address of another computer. Typing works on this page. Auto uses browser speech on Chrome and Edge, and recording plus the server on iPhone when faster-whisper is installed.";
+  } else if (mode === "browser" && isIOS()) {
+    ui.support.textContent = "Hold Push to talk and speak. The words go into the box so you can edit them, then tap Send. If Safari cannot hear you, the next hold records for the server when transcription is installed.";
   } else if (mode === "browser") {
-    ui.support.textContent = "Push to talk uses the browser Web Speech API. Hold the button or the space bar. On iPhone this API is unreliable, so Auto switches to Record and transcribe when the server can hear you.";
+    ui.support.textContent = "Push to talk uses the browser Web Speech API. Hold the button or the space bar. The transmission is sent when you release.";
   } else if (mode === "server") {
     ui.support.textContent = "Push to talk records in the browser and the trainer transcribes it on the server. iPhone sends an mp4/aac file. No paid speech API.";
-  } else if (isIOS() && !serverWhisper) {
-    ui.support.textContent = "Safari on iPhone and iPad has no reliable on-device recognition here, and server transcription is not installed. Type the transmission, or install optional faster-whisper and choose Record and transcribe.";
+  } else if (isIOS()) {
+    ui.support.textContent = "Safari could not use speech recognition, and server transcription is not installed on this host. Type the transmission and tap Send.";
   } else {
     ui.support.textContent = "Voice recognition is off for this browser. Type what you would say and press Send.";
   }
@@ -129,10 +140,20 @@ function apply(view, speak) {
     });
   } else if (!view.movement) {
     map.snap(view.position);
-    if (speak && view.speech && view.speech.speech) {
-      radio.speak(view.speech.speech).then(showRadioMode);
+    if (view.speech && view.speech.speech) {
+      radio.remember(view.speech.speech);
+      if (speak) speakAtc(view.speech.speech);
     }
   }
+}
+
+function speakAtc(text) {
+  const tutorial = document.getElementById("tutorial");
+  if (tutorial && !tutorial.hidden) {
+    radio.queuedAtc = text;
+    return;
+  }
+  radio.speak(text).then(showRadioMode);
 }
 
 function render(view) {
@@ -181,7 +202,7 @@ function render(view) {
   });
   ui.example.hidden = true;
   ui.example.textContent = view.example || "";
-  document.getElementById("hint").textContent = "Show example";
+  document.getElementById("hint").textContent = "Show hint";
   renderResult(view);
   document.querySelector(".comms").classList.toggle("tx-you", false);
 }
@@ -268,10 +289,16 @@ function fillSources(sources) {
 }
 
 function showRadioMode() {
+  if (radio.muted) {
+    ui.radioMode.textContent = "Speaker is off. ATC text still appears. Tap Speaker on to hear it.";
+    return;
+  }
   ui.radioMode.textContent = radio.mode === "filtered"
     ? "Radio effect: the voice is band-pass filtered, with light static and squelch clicks."
-    : "Radio effect: static and squelch around the browser voice. A local WAV (pyttsx3 or espeak) is filtered fully when that engine is available.";
+    : "Radio effect: the browser voice is speaking, with static and squelch. The server voice is used when it answers in time.";
 }
+
+const FATAL_SPEECH = ["not-allowed", "service-not-allowed", "network", "audio-capture", "start-failed"];
 
 function startListen() {
   if (holding || radio.speaking || ui.ptt.disabled) return;
@@ -280,32 +307,59 @@ function startListen() {
     startRecording();
     return;
   }
-  if (mode !== "browser" || !SpeechRecognition) return;
+  if (mode !== "browser" || !SpeechRecognition) {
+    offerTyped("Voice recognition is not available. Type the transmission and tap Send.");
+    return;
+  }
   holding = true;
+  browserListenDone = false;
+  abandonRecognition = false;
+  iosRestarts = 0;
+  recognitionError = "";
   listenBuffer = "";
   ui.ptt.setAttribute("aria-pressed", "true");
   document.querySelector(".comms").classList.add("tx-you");
   recognition = new SpeechRecognition();
   recognition.lang = "en-US";
-  recognition.continuous = true;
   recognition.interimResults = true;
+  recognition.continuous = !isIOS();
   recognition.onresult = (event) => {
     let interim = "";
     for (let i = event.resultIndex; i < event.results.length; i += 1) {
       const piece = event.results[i][0].transcript;
-      if (event.results[i].isFinal) listenBuffer += piece + " ";
+      if (event.results[i].isFinal) listenBuffer += `${piece} `;
       else interim += piece;
     }
-    ui.said.textContent = (listenBuffer + interim).trim() || "Listening…";
+    const heard = (listenBuffer + interim).trim();
+    ui.said.textContent = heard || "Listening…";
+    if (isIOS() && heard) ui.typed.value = heard;
   };
-  recognition.onerror = () => {
-    ui.support.textContent = "The microphone was blocked or the recognizer stopped. Allow the microphone for this site, switch Voice input to Record and transcribe, or type the transmission.";
+  recognition.onerror = (event) => {
+    recognitionError = event && event.error ? event.error : "error";
+    if (FATAL_SPEECH.includes(recognitionError) && holding && serverWhisper) {
+      abandonRecognition = true;
+      holding = false;
+      try { recognition.stop(); } catch (err) { /* already stopped */ }
+      startRecording();
+    }
+  };
+  recognition.onend = () => {
+    if (abandonRecognition) return;
+    if (holding && isIOS() && !FATAL_SPEECH.includes(recognitionError) && iosRestarts < 8) {
+      iosRestarts += 1;
+      try { recognition.start(); } catch (err) { /* restart on the next press */ }
+      return;
+    }
+    if (!holding) finishBrowserListen();
   };
   try {
     recognition.start();
   } catch (err) {
+    recognitionError = "start-failed";
     holding = false;
     ui.ptt.setAttribute("aria-pressed", "false");
+    document.querySelector(".comms").classList.remove("tx-you");
+    handleSpeechFailure();
   }
 }
 
@@ -318,12 +372,43 @@ function stopListen() {
   holding = false;
   ui.ptt.setAttribute("aria-pressed", "false");
   document.querySelector(".comms").classList.remove("tx-you");
-  if (recognition) recognition.stop();
-  setTimeout(() => {
-    const text = listenBuffer.trim();
-    listenBuffer = "";
-    if (text) sendText(text);
-  }, 350);
+  if (recognition) {
+    try { recognition.stop(); } catch (err) { /* already stopped */ }
+  }
+  setTimeout(finishBrowserListen, isIOS() ? 900 : 350);
+}
+
+function finishBrowserListen() {
+  if (browserListenDone) return;
+  browserListenDone = true;
+  const text = listenBuffer.trim();
+  listenBuffer = "";
+  if (!text) {
+    if (recognitionError) handleSpeechFailure();
+    return;
+  }
+  ui.typed.value = text;
+  ui.said.textContent = text;
+  if (isIOS()) {
+    ui.support.textContent = "Check the words, then tap Send.";
+    return;
+  }
+  sendText(text);
+}
+
+function handleSpeechFailure() {
+  if (FATAL_SPEECH.includes(recognitionError) && serverWhisper) {
+    preferServer = true;
+    supportLine();
+    ui.support.textContent = "Safari speech did not start. The next hold records audio for the server.";
+    return;
+  }
+  offerTyped("I didn't catch that. Type the transmission and tap Send.");
+}
+
+function offerTyped(message) {
+  ui.support.textContent = message;
+  ui.ptt.disabled = effectiveMode() === "typed";
 }
 
 function pickMime() {
@@ -387,8 +472,15 @@ function stopRecording() {
         ui.said.textContent = "Transcription failed.";
         return;
       }
-      if (payload.text) sendText(payload.text);
-      else ui.said.textContent = "No words recognised. Try again or type.";
+      if (payload.text && isIOS()) {
+        ui.typed.value = payload.text;
+        ui.said.textContent = payload.text;
+        ui.support.textContent = "Check the words, then tap Send.";
+      } else if (payload.text) {
+        sendText(payload.text);
+      } else {
+        ui.said.textContent = "No words recognised. Try again or type.";
+      }
     } catch (err) {
       ui.support.textContent = "Could not reach the trainer to transcribe. Type the transmission.";
     }
@@ -432,8 +524,32 @@ window.addEventListener("keyup", (event) => {
 document.getElementById("hint").addEventListener("click", () => {
   const open = ui.example.hidden;
   ui.example.hidden = !open;
-  document.getElementById("hint").textContent = open ? "Hide example" : "Show example";
+  document.getElementById("hint").textContent = open ? "Hide hint" : "Show hint";
 });
+document.getElementById("speaker-toggle").addEventListener("click", () => {
+  radio.unlock();
+  radio.muted = !radio.muted;
+  localStorage.setItem("lkpr-speaker", radio.muted ? "off" : "on");
+  if (radio.muted) radio.skip();
+  syncSpeakerButton();
+  showRadioMode();
+});
+document.getElementById("repeat-atc").addEventListener("click", () => {
+  radio.unlock();
+  if (radio.muted) {
+    radio.muted = false;
+    localStorage.setItem("lkpr-speaker", "on");
+    syncSpeakerButton();
+  }
+  if (radio.lastText) radio.speak(radio.lastText).then(showRadioMode);
+});
+document.getElementById("tutorial-open").addEventListener("click", () => {
+  radio.unlock();
+  openTutorial();
+});
+document.getElementById("tutorial-next").addEventListener("click", onTutorialNext);
+document.getElementById("tutorial-back").addEventListener("click", onTutorialBack);
+document.getElementById("tutorial-skip").addEventListener("click", () => closeTutorial(true));
 document.getElementById("skip-voice").addEventListener("click", () => radio.skip());
 document.getElementById("speed").addEventListener("click", (event) => {
   session.speed = session.speed === 1 ? 4 : 1;
@@ -466,6 +582,136 @@ map.onFollowChange = (value) => ui.follow.setAttribute("aria-pressed", value ? "
 
 if (window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  window.speechSynthesis.getVoices();
+}
+
+const TUTORIAL = [
+  {
+    title: "Welcome",
+    body: "This is a practice radio for a departure from Prague, LKPR. You hear the controller, you answer, and the aircraft moves only after a correct readback. It is training, not a clearance for a real flight.",
+    speech: "Welcome. This is a practice radio for a departure from Prague. You hear the controller, you answer, and the aircraft moves only after a correct readback.",
+    target: null,
+  },
+  {
+    title: "Your aircraft",
+    body: "The map is Prague Airport. Callsign OK-ABC is parked at stand 3. The magenta line is the training taxi route toward runway 24. The aircraft stays off the runway until a later clearance.",
+    speech: "The map is Prague Airport. Oscar Kilo Alfa Bravo Charlie is parked at stand 3. The magenta line is the training taxi route.",
+    target: ".map-wrap",
+  },
+  {
+    title: "Who is talking",
+    body: "This panel shows the unit on frequency, such as Ruzyně Delivery, and the frequency from the AIP. The words underneath are what ATC said. Every transmission is spoken as well as shown.",
+    speech: "This panel shows who is on frequency, and the words they said. Every transmission is spoken as well as shown.",
+    target: ".comms-head",
+  },
+  {
+    title: "How you answer",
+    body: "Hold the big Push to talk button and speak, then release. On a computer you can hold the space bar. Or type the call and tap Send. On iPhone, check the words in the box before you send them.",
+    speech: "Hold the big push to talk button and speak, then release. Or type the call and tap Send.",
+    target: ".pilot-row",
+  },
+  {
+    title: "What to read back",
+    body: "A readback repeats the safety items in the clearance: runway, QNH, frequency, heading, altitude, taxi route, hold short, and line-up or takeoff. End with your callsign. Roger alone is not enough.",
+    speech: "Read back the runway, QNH, frequency, heading, altitude, taxi route, hold short, and the clearance. End with your callsign.",
+    target: "#prompt",
+  },
+  {
+    title: "Your first call",
+    body: "Try: Ruzyne Delivery, Oscar Kilo Alfa Bravo Charlie, stand 3, request startup. Show hint, under the radio buttons, reveals the example for the step you are on.",
+    speech: "Your first call is: Ruzyne Delivery, Oscar Kilo Alfa Bravo Charlie, stand 3, request startup.",
+    target: "#hint",
+  },
+  {
+    title: "Score and mistakes",
+    body: "After you transmit, you see what you said, what was expected, and what was missing or wrong. A critical mistake, such as the wrong runway, makes ATC say Negative. The aircraft does not move until you correct it.",
+    speech: "The score panel shows what you said, what was expected, and what was missing. If ATC says negative, the aircraft waits until you correct it.",
+    target: ".eval",
+  },
+  {
+    title: "Start the departure",
+    body: "You are at stand 3, ready to call Delivery. Tap Start scenario. The tutorial can be opened again from the Tutorial button, which also turns the iPhone speaker on.",
+    speech: "You are at stand 3, ready to call Delivery. Tap start scenario when you are ready.",
+    target: null,
+  },
+];
+
+let tutorialIndex = 0;
+let tutorialHeard = false;
+
+function openTutorial() {
+  tutorialIndex = 0;
+  tutorialHeard = false;
+  document.getElementById("tutorial").hidden = false;
+  showTutorialStep();
+}
+
+function showTutorialStep() {
+  const step = TUTORIAL[tutorialIndex];
+  document.querySelectorAll(".tutorial-target").forEach((node) => node.classList.remove("tutorial-target"));
+  document.getElementById("tutorial-count").textContent = `Step ${tutorialIndex + 1} of ${TUTORIAL.length}`;
+  document.getElementById("tutorial-title").textContent = step.title;
+  document.getElementById("tutorial-body").textContent = step.body;
+  const next = document.getElementById("tutorial-next");
+  const last = tutorialIndex === TUTORIAL.length - 1;
+  if (!tutorialHeard) next.textContent = "Start";
+  else next.textContent = last ? "Start scenario" : "Next";
+  document.getElementById("tutorial-back").disabled = tutorialIndex === 0;
+  if (step.target) {
+    const node = document.querySelector(step.target);
+    if (node) {
+      node.classList.add("tutorial-target");
+      node.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }
+}
+
+function onTutorialNext() {
+  radio.unlock();
+  const last = tutorialIndex === TUTORIAL.length - 1;
+  if (!tutorialHeard) {
+    tutorialHeard = true;
+    showTutorialStep();
+    radio.speak(TUTORIAL[tutorialIndex].speech).then(showRadioMode);
+    return;
+  }
+  if (last) {
+    closeTutorial(true);
+    return;
+  }
+  tutorialIndex += 1;
+  tutorialHeard = true;
+  showTutorialStep();
+  radio.speak(TUTORIAL[tutorialIndex].speech).then(showRadioMode);
+}
+
+function onTutorialBack() {
+  radio.unlock();
+  if (tutorialIndex === 0) return;
+  tutorialIndex -= 1;
+  tutorialHeard = true;
+  showTutorialStep();
+  radio.speak(TUTORIAL[tutorialIndex].speech).then(showRadioMode);
+}
+
+function closeTutorial(markDone) {
+  document.getElementById("tutorial").hidden = true;
+  document.querySelectorAll(".tutorial-target").forEach((node) => node.classList.remove("tutorial-target"));
+  radio.skip();
+  if (markDone) localStorage.setItem("lkpr-tutorial-done", "1");
+  if (radio.queuedAtc) {
+    const pending = radio.queuedAtc;
+    radio.queuedAtc = "";
+    radio.speak(pending).then(showRadioMode);
+  }
+}
+
+function syncSpeakerButton() {
+  const button = document.getElementById("speaker-toggle");
+  button.textContent = radio.muted ? "Speaker off" : "Speaker on";
+  button.setAttribute("aria-pressed", radio.muted ? "false" : "true");
 }
 
 boot();
+if (!localStorage.getItem("lkpr-tutorial-done")) openTutorial();
+syncSpeakerButton();

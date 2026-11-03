@@ -10,6 +10,10 @@ class Radio {
     this.speaking = false;
     this.mode = "";
     this._skip = null;
+    this.keeper = null;
+    this.lastText = "";
+    this.unlocked = false;
+    this.muted = localStorage.getItem("lkpr-speaker") === "off";
   }
 
   ensure() {
@@ -21,25 +25,31 @@ class Radio {
   }
 
   unlock() {
-    /* iOS will not play audio that starts outside a tap. Call this synchronously
-       from the gesture, before any await. A resumed AudioContext can then play
-       the server WAV later. speechSynthesis on iOS is less reliable. */
+    /* Call this synchronously inside a tap or click, before any await.
+       iOS only allows later ATC audio if a buffer actually starts during that gesture. */
     const ctx = this.ensure();
-    if (ctx.state === "suspended") ctx.resume();
-    const buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    const pending = ctx.resume();
+    const frames = Math.max(1, Math.floor(ctx.sampleRate * 0.2));
+    const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
     const src = ctx.createBufferSource();
     src.buffer = buffer;
-    src.connect(ctx.destination);
-    src.start();
-    this.unlocked = true;
-    if (window.speechSynthesis) {
-      try {
-        const primer = new SpeechSynthesisUtterance(" ");
-        primer.volume = 0.01;
-        primer.rate = 2;
-        window.speechSynthesis.speak(primer);
-      } catch (err) { /* priming is best-effort */ }
+    const gain = ctx.createGain();
+    gain.gain.value = 0.001;
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    try { src.start(0); } catch (err) { /* already started */ }
+    if (!this.keeper) {
+      const osc = ctx.createOscillator();
+      const hold = ctx.createGain();
+      hold.gain.value = 0.00001;
+      osc.frequency.value = 440;
+      osc.connect(hold);
+      hold.connect(ctx.destination);
+      osc.start();
+      this.keeper = osc;
     }
+    this.unlocked = true;
+    return pending;
   }
 
   async resume() {
@@ -55,35 +65,47 @@ class Radio {
     }
   }
 
+  remember(text) {
+    if (text) this.lastText = text;
+  }
+
   async speak(text) {
+    if (!text) return;
+    this.remember(text);
+    if (this.muted) {
+      this.mode = "muted";
+      return;
+    }
     this.skip();
     const token = {};
     this._token = token;
     this.speaking = true;
     document.querySelector(".comms").classList.add("tx-atc");
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
     try {
       await this.resume();
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
+        signal: controller.signal,
       });
       if (this._token !== token) return;
-      if (response.ok) {
-        const audio = await this.ctx.decodeAudioData(await response.arrayBuffer());
-        if (this._token !== token) return;
-        this.mode = "filtered";
-        await this.playBuffer(audio, token);
-      } else {
-        this.mode = "browser";
-        await this.speakBrowser(text, token);
-      }
+      if (!response.ok) throw new Error("tts unavailable");
+      const raw = await response.arrayBuffer();
+      if (this._token !== token) return;
+      const audio = await this.ctx.decodeAudioData(raw.slice(0));
+      if (this._token !== token) return;
+      this.mode = "filtered";
+      await this.playBuffer(audio, token);
     } catch (err) {
       if (this._token === token) {
         this.mode = "browser";
         await this.speakBrowser(text, token);
       }
     } finally {
+      clearTimeout(timer);
       if (this._token === token) {
         this.speaking = false;
         document.querySelector(".comms").classList.remove("tx-atc");
@@ -138,14 +160,14 @@ class Radio {
         return;
       }
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "en-GB";
-      utterance.rate = 0.94;
-      utterance.pitch = 0.9;
+      utterance.lang = "en-US";
+      utterance.rate = 1.05;
+      utterance.pitch = 1;
       const voices = window.speechSynthesis.getVoices();
-      const voice = voices.find((item) => /en-GB/i.test(item.lang)) || voices.find((item) => /^en/i.test(item.lang));
+      const voice = voices.find((item) => /en-US/i.test(item.lang))
+        || voices.find((item) => /en-GB/i.test(item.lang))
+        || voices.find((item) => /^en/i.test(item.lang));
       if (voice) utterance.voice = voice;
-      const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-      if (ios) utterance.pitch = 1;
       let settled = false;
       const finish = () => {
         if (settled) return;

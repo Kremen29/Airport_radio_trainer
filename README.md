@@ -163,6 +163,14 @@ python -m pip install -r requirements-whisper.txt
 
 Potřebuje také ffmpeg v PATH (na Windows třeba `winget install Gyan.FFmpeg`). Model `base` bere zhruba 1 GB RAM, model `small` zhruba 2 GB. Bez tohoto balíčku přepis vrací chybu a psaní dál funguje. Proměnná `WHISPER_MODEL` může být `tiny`, `base` nebo `small`.
 
+### Výuka a hlas na iPhonu
+
+Při první návštěvě se spustí krátký průvodce v angličtině. Tlačítko Start je zároveň odemčení zvuku: iOS pustí ATC až po klepnutí. Průvodce lze znovu otevřít tlačítkem Tutorial. Next, Back a Skip jsou dole na obrazovce, ať panel na iPhonu nepřeteče.
+
+Každá hláška ATC se čte nahlas a zároveň je v textu. Tlačítko Repeat ji zopakuje, Speaker on/off ji ztlumí. Když server nestihne hlas do osmi sekund, mluví hlas prohlížeče. Na iPhonu postranní přepínač tichého režimu zvuk ztiší: hlasitost nahoru a tichý režim vypnout.
+
+Auto na iPhonu nejdřív zkusí rozpoznání Safari. Slova se objeví v poli, zkontrolujete je a klepnete na Send. Když Safari nepustí mikrofon a na serveru je faster-whisper, další stisk nahrává. Na Renderu bez whisperu zbývá psaní. Na počítači se věta po puštění tlačítka odešle sama, jako dřív.
+
 ### Co jede offline a co potřebuje server nebo internet
 
 Po jednom úspěšném otevření si stránka do service workeru uloží vzhled, skripty a data mapy (`/api/airport`). Bez sítě se diagram může ukázat znovu.

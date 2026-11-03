@@ -21,6 +21,7 @@ def test_manifest_and_service_worker():
     assert worker.status_code == 200
     assert "/api/airport" in worker.text
     assert "caches" in worker.text
+    assert "lkpr-trainer-v3" in worker.text
 
     page = client.get("/")
     assert page.status_code == 200
@@ -29,6 +30,17 @@ def test_manifest_and_service_worker():
     assert "apple-mobile-web-app-capable" in html
     assert "apple-touch-icon" in html
     assert 'id="input-mode"' in html
+    assert 'id="tutorial"' in html
+    assert 'id="speaker-toggle"' in html
+    assert 'id="repeat-atc"' in html
+    assert "silent switch" in html
+    script = client.get("/static/js/app.js")
+    assert script.status_code == 200
+    assert "request startup" in script.text
+    assert "SpeechRecognition" in script.text
+    radio = client.get("/static/js/radio.js")
+    assert "decodeAudioData" in radio.text
+    assert "8000" in radio.text
 
     for path in (
         "/static/icons/icon-192.png",

@@ -487,6 +487,58 @@ dialog form { max-height: calc(100vh - 48px); overflow: auto; }
   .pilot-row { flex-direction: column; }
 }
 
+.tutorial {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+
+.tutorial-card {
+  pointer-events: auto;
+  max-width: 640px;
+  margin: 0 auto;
+  max-height: min(46dvh, 420px);
+  overflow: auto;
+  background: var(--paper);
+  color: var(--navy);
+  border-radius: 16px 16px 0 0;
+  padding: 14px 16px 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.tutorial-card h2 { margin: 4px 0 8px; font-size: 20px; }
+.tutorial-card p { margin: 0; line-height: 1.4; }
+
+.tutorial-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+}
+
+.tutorial-actions #tutorial-next {
+  margin-left: auto;
+  border: 0;
+  background: var(--magenta);
+  color: white;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.tutorial-target {
+  outline: 3px solid var(--magenta);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .meters span { animation: none; }
 }

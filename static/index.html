@@ -21,6 +21,7 @@
       <p class="brand-name">LKPR <span>Radio trainer</span></p>
     </div>
     <nav id="phase-nav" class="phases" aria-label="Flight phase"></nav>
+    <button id="tutorial-open" class="text-button" type="button">Tutorial</button>
     <button id="sources-open" class="text-button" type="button">Sources</button>
   </header>
 
@@ -107,8 +108,11 @@
         </div>
       </div>
 
+      <p id="silent-hint" class="support">iPhone: the silent switch mutes ATC. Turn the volume up and switch silent mode off.</p>
       <div class="hint-row">
-        <button id="hint" class="text-button" type="button">Show example</button>
+        <button id="speaker-toggle" class="text-button" type="button" aria-pressed="true">Speaker on</button>
+        <button id="repeat-atc" class="text-button" type="button">Repeat</button>
+        <button id="hint" class="text-button" type="button">Show hint</button>
         <button id="skip-voice" class="text-button" type="button">Skip voice</button>
         <button id="speed" class="text-button" type="button">Movement 1×</button>
         <button id="restart" class="text-button" type="button">Restart</button>
@@ -117,6 +121,19 @@
       <section id="result" class="result" hidden></section>
     </section>
   </main>
+
+  <div id="tutorial" class="tutorial" hidden>
+    <section class="tutorial-card" role="dialog" aria-labelledby="tutorial-title">
+      <p id="tutorial-count" class="speaker-kicker">Tutorial</p>
+      <h2 id="tutorial-title">Welcome</h2>
+      <p id="tutorial-body"></p>
+      <div class="tutorial-actions">
+        <button id="tutorial-back" class="text-button" type="button">Back</button>
+        <button id="tutorial-skip" class="text-button" type="button">Skip</button>
+        <button id="tutorial-next" type="button">Start</button>
+      </div>
+    </section>
+  </div>
 
   <dialog id="sources-dialog">
     <form method="dialog">

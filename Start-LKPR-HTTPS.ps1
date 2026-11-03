@@ -1,4 +1,4 @@
-# HTTPS pro mikrofon na iPhonu ve stejné Wi-Fi. Certifikát je cvičný a iOS mu sám nevěří.
+# HTTPS for the iPhone microphone on the same Wi-Fi. The certificate is for training only and iOS does not trust it by default.
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
@@ -16,8 +16,8 @@ $ip = (
 if (-not $ip) { $ip = "127.0.0.1" }
 python .\scripts\make_dev_cert.py localhost 127.0.0.1 $ip
 Write-Host ""
-Write-Host "Na telefonu ve stejné síti otevřete: https://${ip}:8741"
-Write-Host "iOS ukáže varování. Důvěra k vlastnímu certifikátu je v README, část Mobil."
-Write-Host "Povolte port 8741 ve firewallu Windows pro soukromou síť."
+Write-Host "On a phone on the same network, open: https://${ip}:8741"
+Write-Host "iOS will show a warning. Trusting a self-signed certificate is covered in the README, Mobile section."
+Write-Host "Allow port 8741 in Windows Firewall for the private network."
 Write-Host ""
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8741 --ssl-keyfile certs/dev-key.pem --ssl-certfile certs/dev-cert.pem

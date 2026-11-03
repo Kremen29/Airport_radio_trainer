@@ -21,7 +21,7 @@ def test_manifest_and_service_worker():
     assert worker.status_code == 200
     assert "/api/airport" in worker.text
     assert "caches" in worker.text
-    assert "lkpr-trainer-v5" in worker.text
+    assert "lkpr-trainer-v6" in worker.text
 
     page = client.get("/")
     assert page.status_code == 200

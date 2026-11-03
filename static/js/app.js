@@ -890,9 +890,10 @@ function paintPreview() {
   ctx.fillStyle = "#e7efe4";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   const data = currentAircraft();
+  const ppm = 118 / 79.75;
   ctx.save();
-  ctx.translate(canvas.width / 2, canvas.height / 2 + 8);
-  drawAircraftIcon(ctx, 110, data.type, data.livery);
+  ctx.translate(canvas.width / 2, canvas.height / 2 + 6);
+  drawAircraftIcon(ctx, AIRCRAFT_TYPES[data.type].span * ppm, data.type, data.livery);
   ctx.restore();
   const spec = AIRCRAFT_TYPES[data.type];
   note.textContent = `${spec.name}. ${spec.note} The colours are a made-up paint scheme, not a real airline.`;

@@ -441,7 +441,7 @@ class AirportMap {
     const screen = this.toScreen(this.aircraft.lat, this.aircraft.lon);
     const type = (this.aircraftStyle && this.aircraftStyle.type) || "A320";
     const spec = (typeof AIRCRAFT_TYPES !== "undefined" && AIRCRAFT_TYPES[type]) || { span: 36 };
-    const spanPx = Math.max(26, Math.min(150, this.metersToPx(spec.span)));
+    const spanPx = Math.max(22, this.metersToPx(spec.span));
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(screen.x, screen.y);

@@ -31,6 +31,7 @@
     <p><span>Mode</span><strong>Readback training</strong></p>
     <p><span>Scenario</span><strong id="info-scenario">Departure</strong></p>
     <p><span>Score</span><strong id="info-score">–</strong></p>
+    <p><span>Hints</span><strong id="info-hints">0</strong></p>
   </section>
 
   <main class="stage">
@@ -68,7 +69,35 @@
       <ul id="notes" class="notes"></ul>
       <p id="prompt" class="prompt"></p>
 
+      <section id="hint-panel" class="hint-panel" hidden>
+        <h3>Say this</h3>
+        <p id="hint-sentence" class="hint-sentence"></p>
+        <div id="hint-fix" hidden>
+          <h3>Fix these</h3>
+          <ul id="hint-gaps" class="hint-gaps"></ul>
+        </div>
+        <div class="hint-actions">
+          <button id="hint-use" type="button">Use this</button>
+          <button id="hint-hear" class="text-button" type="button">Hear hint</button>
+        </div>
+      </section>
+      <label class="draw-check" for="draw-mode">
+        <input id="draw-mode" type="checkbox">
+        Draw the taxi route
+      </label>
+      <section id="draw-tools" class="draw-tools" hidden>
+        <h3>Draw on the map</h3>
+        <p id="draw-help">Draw from the aircraft to the holding point. Pan is off while Draw is on.</p>
+        <div class="draw-actions">
+          <button id="draw-pen" type="button" aria-pressed="false">Draw off</button>
+          <button id="draw-undo" class="text-button" type="button">Undo</button>
+          <button id="draw-clear" class="text-button" type="button">Clear</button>
+          <button id="draw-submit" class="primary" type="button">Submit</button>
+        </div>
+        <ul id="draw-feedback" class="hint-gaps"></ul>
+      </section>
       <div class="pilot-row">
+        <button id="hint-open" class="hint-button" type="button">Hint</button>
         <button id="ptt" class="ptt" type="button" aria-pressed="false">
           <span class="ptt-kicker">Hold</span>
           Push to talk
@@ -112,7 +141,6 @@
       <div class="hint-row">
         <button id="speaker-toggle" class="text-button" type="button" aria-pressed="true">Speaker on</button>
         <button id="repeat-atc" class="text-button" type="button">Repeat</button>
-        <button id="hint" class="text-button" type="button">Show hint</button>
         <button id="skip-voice" class="text-button" type="button">Skip voice</button>
         <button id="speed" class="text-button" type="button">Movement 1×</button>
         <button id="restart" class="text-button" type="button">Restart</button>

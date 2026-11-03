@@ -38,6 +38,14 @@ class SpeechIn(BaseModel):
     text: str = Field(default="", max_length=500)
 
 
+class DrawModeIn(BaseModel):
+    enabled: bool = False
+
+
+class DrawingIn(BaseModel):
+    points: list[list[float]] = Field(default_factory=list, max_length=4000)
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(ROOT / "static" / "index.html")
@@ -93,6 +101,30 @@ def transmission(session_id: str, body: TransmissionIn) -> dict:
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session.transmit(body.text)
+
+
+@app.post("/api/session/{session_id}/hint")
+def use_hint(session_id: str) -> dict:
+    session = store.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session.note_hint()
+
+
+@app.post("/api/session/{session_id}/draw-mode")
+def draw_mode(session_id: str, body: DrawModeIn) -> dict:
+    session = store.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session.set_draw_mode(body.enabled)
+
+
+@app.post("/api/session/{session_id}/drawing")
+def drawing(session_id: str, body: DrawingIn) -> dict:
+    session = store.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session.submit_drawing(body.points)
 
 
 @app.post("/api/session/{session_id}/arrived")

@@ -144,6 +144,16 @@ button { cursor: pointer; }
   cursor: grab;
 }
 
+.map-wrap.pen-on {
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+body.drawing-route {
+  overflow: hidden;
+  touch-action: none;
+}
+
 .map-status {
   position: absolute;
   left: 16px;
@@ -531,6 +541,54 @@ dialog form { max-height: calc(100vh - 48px); overflow: auto; }
   padding: 10px 16px;
   font-weight: 700;
   min-height: 44px;
+}
+
+.hint-button, .draw-tools button.primary {
+  min-height: 52px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--navy);
+  color: white;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+.hint-panel, .draw-tools {
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.hint-panel:not([hidden]) {
+  position: fixed;
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  z-index: 28;
+  max-height: min(52dvh, 380px);
+  overflow: auto;
+  box-shadow: var(--shadow);
+  background: var(--paper);
+}
+
+.hint-panel h3, .draw-tools h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--navy-soft);
+}
+
+.hint-sentence { margin: 0 0 8px; font-size: 17px; line-height: 1.35; }
+.hint-actions, .draw-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hint-gaps { margin: 0 0 8px; padding-left: 18px; }
+.hint-gaps li { margin: 3px 0; }
+.draw-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.draw-check input { width: 18px; height: 18px; }
+
+@media (max-width: 700px) {
+  .hint-button { width: 100%; font-size: 18px; min-height: 56px; }
+  .pilot-row { gap: 8px; }
 }
 
 .tutorial-target {

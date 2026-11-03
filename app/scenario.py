@@ -13,6 +13,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.evaluator import evaluate_transmission
+from app.route_draw import evaluate_drawing
 
 ROOT = Path(__file__).resolve().parents[1]
 ROUTE = json.loads((ROOT / "data" / "departure_route.json").read_text(encoding="utf-8"))
@@ -230,6 +231,11 @@ class DepartureSession:
         self.pending_speech: dict | None = None
         self.instruction = ""
         self.completed = False
+        self.draw_mode = False
+        self.hints_used = 0
+        self.drawing = None
+        self.drawing_submitted = False
+        self.taxi_cleared = False
 
     def _log_atc(self, speaker: str, text: str, keep_as_instruction: bool) -> None:
         self.log.append({"role": "atc", "speaker": speaker, "text": text})
@@ -272,10 +278,46 @@ class DepartureSession:
             return self.payload(movement=None)
 
         move = spec.get("move")
+        if move == "taxi" and self.draw_mode and not self.drawing_submitted:
+            self.taxi_cleared = True
+            self.pending_speech = None
+            return self.payload(movement=None)
         if move:
             self.moving = move
             self.pending_speech = None
             return self.payload(movement=self._movement(move))
+
+        nxt = NEXT_AFTER_ACCEPT.get(self.step)
+        if self.step == "readback_radar" or nxt is None:
+            self.completed = True
+            self.step = "complete"
+            self.pending_speech = None
+            return self.payload()
+
+        self.step = nxt
+        return self._speak_current()
+
+    def note_hint(self) -> dict:
+        """Counting a hint must not change the step or block the aircraft."""
+        self.hints_used += 1
+        return self.payload()
+
+    def set_draw_mode(self, enabled: bool) -> dict:
+        if not self.moving and self.position in {"stand", "apron"}:
+            self.draw_mode = bool(enabled)
+            if not self.draw_mode:
+                self.taxi_cleared = False
+        return self.payload()
+
+    def submit_drawing(self, points: list) -> dict:
+        self.drawing = evaluate_drawing(points)
+        if self.drawing.get("submitted"):
+            self.drawing_submitted = True
+        movement = None
+        if self.taxi_cleared and self.drawing_submitted and not self.moving:
+            self.moving = "taxi"
+            movement = self._movement("taxi")
+        return self.payload(movement=movement)
 
         nxt = NEXT_AFTER_ACCEPT.get(self.step)
         if nxt == "complete" or nxt is None and self.step == "readback_radar":
@@ -337,6 +379,7 @@ class DepartureSession:
                 "missed": 0,
                 "critical": 0,
                 "parts": None,
+                "hints_used": self.hints_used,
             }
         overall = round(sum(item["score"] for item in self.attempts) / len(self.attempts), 1)
         parts = {}
@@ -349,6 +392,7 @@ class DepartureSession:
             "missed": sum(item["missing"] for item in self.attempts),
             "critical": sum(1 for item in self.attempts if item["safety_critical"]),
             "parts": parts,
+            "hints_used": self.hints_used,
         }
 
     def payload(self, movement: dict | None = None) -> dict:
@@ -364,8 +408,11 @@ class DepartureSession:
         else:
             spec = STEPS[self.step]
 
+        draw_waiting = self.draw_mode and self.taxi_cleared and not self.drawing_submitted and not self.moving
         if self.moving:
             prompt = "Aircraft moving on the cleared path only. Stand by for the next call."
+        elif draw_waiting:
+            prompt = "Readback accepted. Draw the taxi route from the aircraft to the holding point, then tap Submit. The aircraft follows the cleared route, not a wrong line."
         else:
             prompt = spec["prompt"]
 
@@ -418,6 +465,11 @@ class DepartureSession:
             "awaiting": awaiting,
             "expected": spec["expected"],
             "example": spec["example"],
+            "hints_used": self.hints_used,
+            "draw_mode": self.draw_mode,
+            "draw_tools": bool(self.draw_mode and self.step == "readback_taxi" and not self.moving),
+            "draw_waiting": draw_waiting,
+            "drawing": self.drawing,
             "notes": spec.get("notes", []),
             "atc_text": atc_text,
             "show_lineup": show_lineup,

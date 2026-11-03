@@ -1,5 +1,5 @@
 /* Caches the page shell and the airport diagram. Scoring and transcription stay on the network. */
-const CACHE = "lkpr-trainer-v3";
+const CACHE = "lkpr-trainer-v4";
 const SHELL = [
   "/",
   "/manifest.webmanifest",

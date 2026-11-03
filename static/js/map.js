@@ -24,6 +24,10 @@ class AirportMap {
     this._pinch = null;
     this._labels = [];
     this.onFollowChange = null;
+    this.pen = false;
+    this.userPoints = [];
+    this.userRunway = false;
+    this._drawingStroke = false;
     this._bind();
   }
 
@@ -178,6 +182,7 @@ class AirportMap {
       });
     });
     this.drawRoute();
+    this.drawUserPath();
     this.drawHold();
     this.drawLabels();
     this.drawAircraft();
@@ -277,6 +282,24 @@ class AirportMap {
     ctx.setLineDash(dashed ? [5, 6] : []);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+
+  drawUserPath() {
+    if (!this.userPoints.length) return;
+    this.strokePath(this.userPoints, this.userRunway ? "#9d1834" : "#1d4f91", 4, false);
+  }
+
+  setPen(on) {
+    this.pen = Boolean(on);
+    this.canvas.style.cursor = this.pen ? "crosshair" : "grab";
+    this.canvas.parentElement.classList.toggle("pen-on", this.pen);
+  }
+
+  screenToLonLat(sx, sy) {
+    const world = this.fromScreen(sx, sy);
+    const lon = world.x / (Math.cos(this.originLat * Math.PI / 180) * 111320) + this.originLon;
+    const lat = world.y / 110540 + this.originLat;
+    return [lon, lat];
   }
 
   drawHold() {
@@ -557,6 +580,13 @@ class AirportMap {
 
     canvas.addEventListener("pointerdown", (event) => {
       canvas.setPointerCapture(event.pointerId);
+      if (this.pen) {
+        event.preventDefault();
+        this._drawingStroke = true;
+        this.userPoints.push(this.screenToLonLat(event.offsetX, event.offsetY));
+        this.draw();
+        return;
+      }
       this._pointers.set(event.pointerId, { x: event.offsetX, y: event.offsetY });
       if (this._pointers.size === 2) {
         const [p, q] = [...this._pointers.values()];
@@ -564,6 +594,14 @@ class AirportMap {
       }
     });
     canvas.addEventListener("pointermove", (event) => {
+      if (this.pen && this._drawingStroke) {
+        event.preventDefault();
+        const next = this.screenToLonLat(event.offsetX, event.offsetY);
+        const prev = this.userPoints[this.userPoints.length - 1];
+        if (!prev || this.meters(prev, next) > 4) this.userPoints.push(next);
+        this.draw();
+        return;
+      }
       if (!this._pointers.has(event.pointerId)) return;
       const previous = this._pointers.get(event.pointerId);
       this._pointers.set(event.pointerId, { x: event.offsetX, y: event.offsetY });
@@ -585,9 +623,13 @@ class AirportMap {
       }
     });
     const end = (event) => {
+      this._drawingStroke = false;
       this._pointers.delete(event.pointerId);
       if (this._pointers.size < 2) this._pinch = null;
     };
+    canvas.addEventListener("touchmove", (event) => {
+      if (this.pen) event.preventDefault();
+    }, { passive: false });
     canvas.addEventListener("pointerup", end);
     canvas.addEventListener("pointercancel", end);
     window.addEventListener("resize", () => this.resize());

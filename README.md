@@ -173,6 +173,12 @@ Every ATC transmission is read aloud and also shown as text. The Repeat button r
 
 Auto on iPhone first tries Safari recognition. The words appear in the field, you check them, and tap Send. If Safari does not allow the microphone and faster-whisper is on the server, the next press records. On Render without whisper, typing remains. On a computer, the sentence is sent automatically when you release the button, as before.
 
+### Hint and drawing the taxi route
+
+Hint is always on the radio panel. It shows the full sentence expected right now, with the full callsign, for both the first call and a readback. After a wrong readback it also lists what was missing or incorrect and the corrected sentence, so you are not stuck. Use this copies that sentence into the text box. Hear hint speaks it. Using a hint is counted on the score and never blocks the aircraft.
+
+Draw the taxi route is optional. Turn it on before the taxi clearance. When Ground says taxi via Alfa 1 and Zulu, hold short of runway 24, turn Draw on and trace the path from the aircraft to the holding point. Draw on disables panning so the page does not scroll. Undo and Clear fix the line. Submit compares it with the OpenStreetMap taxiways. Your line is blue (red if it would enter the runway) and the cleared route stays magenta. A wrong line is explained, for example a taxiway that is not on the clearance, or entering runway 24 without clearance. Names come only from OSM refs. The aircraft then taxis the cleared route, not the wrong line.
+
 ### What works offline and what needs the server or internet
 
 After one successful load, the page stores its look, scripts, and map data (`/api/airport`) in the service worker. Without a network, the diagram can be shown again.

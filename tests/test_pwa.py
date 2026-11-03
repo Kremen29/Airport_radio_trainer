@@ -21,7 +21,7 @@ def test_manifest_and_service_worker():
     assert worker.status_code == 200
     assert "/api/airport" in worker.text
     assert "caches" in worker.text
-    assert "lkpr-trainer-v3" in worker.text
+    assert "lkpr-trainer-v4" in worker.text
 
     page = client.get("/")
     assert page.status_code == 200
@@ -34,6 +34,8 @@ def test_manifest_and_service_worker():
     assert 'id="speaker-toggle"' in html
     assert 'id="repeat-atc"' in html
     assert "silent switch" in html
+    assert 'id="hint-open"' in html
+    assert 'id="draw-mode"' in html
     script = client.get("/static/js/app.js")
     assert script.status_code == 200
     assert "request startup" in script.text

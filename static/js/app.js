@@ -44,6 +44,7 @@ let recordStream = null;
 let recordChunks = [];
 let serverWhisper = false;
 let preferServer = false;
+let penOn = false;
 let browserListenDone = false;
 let recognitionError = "";
 let abandonRecognition = false;
@@ -114,7 +115,15 @@ async function boot() {
     map.load(airport);
     ui.status.hidden = true;
     fillSources(airport.sources);
-    const created = await fetch("/api/session", { method: "POST" }).then((response) => response.json());
+    let created = await fetch("/api/session", { method: "POST" }).then((response) => response.json());
+    if (localStorage.getItem("lkpr-draw") === "1") {
+      const armed = await fetch(`/api/session/${created.session_id}/draw-mode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true }),
+      });
+      if (armed.ok) created = await armed.json();
+    }
     apply(created, false);
   } catch (err) {
     ui.status.hidden = false;
@@ -186,6 +195,8 @@ function render(view) {
   }
   const score = view.score.overall === null ? "–" : `${Math.round(view.score.overall)}%`;
   ui.score.textContent = score;
+  const hints = document.getElementById("info-hints");
+  if (hints) hints.textContent = String(view.hints_used || 0);
   ui.banner.hidden = !view.movement_locked;
   ui.banner.textContent = view.movement_locked
     ? "Movement held. ATC said “Negative”. Correct the missing item before the aircraft moves."
@@ -202,9 +213,69 @@ function render(view) {
   });
   ui.example.hidden = true;
   ui.example.textContent = view.example || "";
-  document.getElementById("hint").textContent = "Show hint";
+  renderHint(view);
+  renderDraw(view);
   renderResult(view);
   document.querySelector(".comms").classList.toggle("tx-you", false);
+}
+
+function renderHint(view) {
+  const sentence = view.example || "Nothing to say on this step.";
+  document.getElementById("hint-sentence").textContent = sentence;
+  const blocked = view.last_evaluation && view.last_evaluation.blocks_progress;
+  const fix = document.getElementById("hint-fix");
+  const list = document.getElementById("hint-gaps");
+  list.innerHTML = "";
+  if (!blocked) {
+    fix.hidden = true;
+    return;
+  }
+  fix.hidden = false;
+  const evaluation = view.last_evaluation;
+  evaluation.missing.forEach((item) => {
+    const line = document.createElement("li");
+    line.textContent = `Missing: ${item}`;
+    list.appendChild(line);
+  });
+  evaluation.incorrect.forEach((item) => {
+    const line = document.createElement("li");
+    line.textContent = `Incorrect: ${item}`;
+    list.appendChild(line);
+  });
+  const corrected = document.createElement("li");
+  corrected.textContent = `Corrected readback: ${sentence}`;
+  list.appendChild(corrected);
+}
+
+function renderDraw(view) {
+  const box = document.getElementById("draw-mode");
+  if (document.activeElement !== box) box.checked = Boolean(view.draw_mode);
+  const tools = document.getElementById("draw-tools");
+  const opening = view.draw_tools && tools.hidden;
+  tools.hidden = !view.draw_tools;
+  if (opening) penOn = true;
+  if (!view.draw_tools) penOn = false;
+  syncPen();
+  const list = document.getElementById("draw-feedback");
+  list.innerHTML = "";
+  if (view.drawing && view.drawing.feedback) {
+    map.userRunway = Boolean(view.drawing.entered_runway);
+    view.drawing.feedback.forEach((line) => {
+      const item = document.createElement("li");
+      item.textContent = line;
+      list.appendChild(item);
+    });
+    map.draw();
+  }
+}
+
+function syncPen() {
+  const button = document.getElementById("draw-pen");
+  const toolsOpen = !document.getElementById("draw-tools").hidden;
+  map.setPen(penOn && toolsOpen);
+  button.textContent = penOn ? "Draw on" : "Draw off";
+  button.setAttribute("aria-pressed", penOn ? "true" : "false");
+  document.body.classList.toggle("drawing-route", penOn && toolsOpen);
 }
 
 function renderResult(view) {
@@ -223,6 +294,7 @@ function renderResult(view) {
       <dt>Errors</dt><dd>${score.errors}</dd>
       <dt>Missed elements</dt><dd>${score.missed}</dd>
       <dt>Critical mistakes</dt><dd>${score.critical}</dd>
+      <dt>Hints used</dt><dd>${score.hints_used || 0}</dd>
       <dt>Critical instructions</dt><dd>${parts.critical}%</dd>
       <dt>Callsign</dt><dd>${parts.callsign}%</dd>
       <dt>Runway and routing</dt><dd>${parts.routing}%</dd>
@@ -521,10 +593,61 @@ window.addEventListener("keyup", (event) => {
   if (event.code === "Space" && event.target !== ui.typed) stopListen();
 });
 
-document.getElementById("hint").addEventListener("click", () => {
-  const open = ui.example.hidden;
-  ui.example.hidden = !open;
-  document.getElementById("hint").textContent = open ? "Hide hint" : "Show hint";
+document.getElementById("hint-open").addEventListener("click", () => {
+  const panel = document.getElementById("hint-panel");
+  panel.hidden = !panel.hidden;
+});
+document.getElementById("hint-use").addEventListener("click", async () => {
+  const sentence = document.getElementById("hint-sentence").textContent.trim();
+  if (!sentence || !session.id) return;
+  ui.typed.value = sentence;
+  ui.typed.focus();
+  const response = await fetch(`/api/session/${session.id}/hint`, { method: "POST" });
+  if (response.ok) apply(await response.json(), false);
+});
+document.getElementById("hint-hear").addEventListener("click", () => {
+  radio.unlock();
+  const sentence = document.getElementById("hint-sentence").textContent.trim();
+  if (sentence) radio.speak(sentence).then(showRadioMode);
+});
+document.getElementById("draw-mode").addEventListener("change", async (event) => {
+  localStorage.setItem("lkpr-draw", event.target.checked ? "1" : "0");
+  if (!session.id) return;
+  const response = await fetch(`/api/session/${session.id}/draw-mode`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled: event.target.checked }),
+  });
+  if (response.ok) apply(await response.json(), false);
+});
+document.getElementById("draw-pen").addEventListener("click", () => {
+  penOn = !penOn;
+  syncPen();
+});
+document.getElementById("draw-undo").addEventListener("click", () => {
+  map.userPoints.pop();
+  map.userRunway = false;
+  map.draw();
+});
+document.getElementById("draw-clear").addEventListener("click", () => {
+  map.userPoints = [];
+  map.userRunway = false;
+  map.draw();
+  document.getElementById("draw-feedback").innerHTML = "";
+});
+document.getElementById("draw-submit").addEventListener("click", async () => {
+  if (!session.id) return;
+  if (map.userPoints.length < 2) {
+    document.getElementById("draw-feedback").innerHTML = "<li>Draw a line from the aircraft to the holding point first.</li>";
+    return;
+  }
+  const response = await fetch(`/api/session/${session.id}/drawing`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ points: map.userPoints }),
+  });
+  if (!response.ok) return;
+  apply(await response.json(), true);
 });
 document.getElementById("speaker-toggle").addEventListener("click", () => {
   radio.unlock();
@@ -618,9 +741,9 @@ const TUTORIAL = [
   },
   {
     title: "Your first call",
-    body: "Try: Ruzyne Delivery, Oscar Kilo Alfa Bravo Charlie, stand 3, request startup. Show hint, under the radio buttons, reveals the example for the step you are on.",
-    speech: "Your first call is: Ruzyne Delivery, Oscar Kilo Alfa Bravo Charlie, stand 3, request startup.",
-    target: "#hint",
+    body: "Try: Ruzyne Delivery, Oscar Kilo Alfa Bravo Charlie, stand 3, request startup. The Hint button shows that full sentence. Use this copies it into the box. A hint never stops the aircraft.",
+    speech: "Your first call is: Ruzyne Delivery, Oscar Kilo Alfa Bravo Charlie, stand 3, request startup. The Hint button shows the full sentence.",
+    target: "#hint-open",
   },
   {
     title: "Score and mistakes",

@@ -1,0 +1,4 @@
+# Optional. Needed only for "Record and transcribe" (iPhone fallback).
+# The base model uses about 1 GB of RAM. The small model uses about 2 GB.
+# Do not install this on a 512 MB host.
+faster-whisper>=1.1.0,<2

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b2740">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="LKPR Radio">
+  <title>LKPR Radio Trainer</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <p class="brand-kicker">Václav Havel Airport</p>
+      <p class="brand-name">LKPR <span>Radio trainer</span></p>
+    </div>
+    <nav id="phase-nav" class="phases" aria-label="Flight phase"></nav>
+    <button id="sources-open" class="text-button" type="button">Sources</button>
+  </header>
+
+  <section class="info" aria-label="Flight information">
+    <p><span>Airport</span><strong id="info-airport">LKPR</strong></p>
+    <p><span>Callsign</span><strong id="info-callsign">OK-ABC</strong></p>
+    <p><span>Mode</span><strong>Readback training</strong></p>
+    <p><span>Scenario</span><strong id="info-scenario">Departure</strong></p>
+    <p><span>Score</span><strong id="info-score">–</strong></p>
+  </section>
+
+  <main class="stage">
+    <div class="map-wrap">
+      <canvas id="airport" aria-label="Prague Airport diagram"></canvas>
+      <p id="map-status" class="map-status">Loading the airport diagram…</p>
+      <div class="map-tools">
+        <button id="zoom-in" type="button" aria-label="Zoom in">+</button>
+        <button id="zoom-out" type="button" aria-label="Zoom out">−</button>
+        <button id="fit" type="button">Fit</button>
+        <button id="follow" type="button" aria-pressed="false">Follow</button>
+      </div>
+      <ul class="legend">
+        <li><i class="swatch runway"></i>Runway</li>
+        <li><i class="swatch taxi"></i>Taxiway</li>
+        <li><i class="swatch route"></i>Training route</li>
+        <li><i class="swatch hold"></i>Hold short</li>
+      </ul>
+      <p class="map-credit">Map data © OpenStreetMap contributors, ODbL. Not an official aerodrome chart.</p>
+      <p id="banner" class="banner" hidden></p>
+    </div>
+
+    <section class="comms" aria-label="Radio">
+      <div class="comms-head">
+        <div>
+          <p id="awaiting-label" class="speaker-kicker">Radio</p>
+          <h2 id="speaker-name">RUZYNĚ DELIVERY</h2>
+          <p id="speaker-freq" class="freq"></p>
+        </div>
+        <div id="meters" class="meters" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <p id="atc-text" class="atc-text" aria-live="polite"></p>
+      <ul id="notes" class="notes"></ul>
+      <p id="prompt" class="prompt"></p>
+
+      <div class="pilot-row">
+        <button id="ptt" class="ptt" type="button" aria-pressed="false">
+          <span class="ptt-kicker">Hold</span>
+          Push to talk
+        </button>
+        <div class="typed">
+          <label for="typed">Typed transmission</label>
+          <div class="typed-line">
+            <input id="typed" type="text" autocomplete="off" spellcheck="false" placeholder="Type what you would say on the radio">
+            <button id="send" type="button">Send</button>
+          </div>
+        </div>
+      </div>
+      <div class="voice-mode">
+        <label for="input-mode">Voice input</label>
+        <select id="input-mode">
+          <option value="auto">Auto</option>
+          <option value="browser">Browser speech</option>
+          <option value="server">Record and transcribe</option>
+          <option value="typed">Typing only</option>
+        </select>
+      </div>
+      <p id="speech-support" class="support"></p>
+      <p id="radio-mode" class="support"></p>
+
+      <div class="eval">
+        <div>
+          <h3>You said</h3>
+          <p id="said">Waiting for your transmission.</p>
+        </div>
+        <div>
+          <h3>Expected</h3>
+          <p id="expected"></p>
+        </div>
+        <div>
+          <h3>Missing or wrong</h3>
+          <p id="gap">–</p>
+        </div>
+      </div>
+
+      <div class="hint-row">
+        <button id="hint" class="text-button" type="button">Show example</button>
+        <button id="skip-voice" class="text-button" type="button">Skip voice</button>
+        <button id="speed" class="text-button" type="button">Movement 1×</button>
+        <button id="restart" class="text-button" type="button">Restart</button>
+      </div>
+      <p id="example" class="example" hidden></p>
+      <section id="result" class="result" hidden></section>
+    </section>
+  </main>
+
+  <dialog id="sources-dialog">
+    <form method="dialog">
+      <header>
+        <h2>Verified data and training content</h2>
+        <button value="cancel" class="text-button" type="submit">Close</button>
+      </header>
+      <div id="sources-body"></div>
+    </form>
+  </dialog>
+
+  <dialog id="stub-dialog">
+    <form method="dialog">
+      <header>
+        <h2 id="stub-title">Later scenario</h2>
+        <button value="cancel" class="text-button" type="submit">Close</button>
+      </header>
+      <div id="stub-body"></div>
+    </form>
+  </dialog>
+
+  <script src="/static/js/map.js"></script>
+  <script src="/static/js/radio.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

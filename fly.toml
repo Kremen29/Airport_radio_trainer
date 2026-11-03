@@ -1,0 +1,24 @@
+# Optional Fly.io config. Not deployed from this project.
+# 512 MB is enough WITHOUT faster-whisper. For iPhone transcription set
+# INSTALL_WHISPER = "1" and memory = "2048mb" (that size is not on the free allowance).
+
+app = "lkpr-radio-trainer"
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+  [build.args]
+    INSTALL_WHISPER = "0"
+
+[http_service]
+  internal_port = 7860
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

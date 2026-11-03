@@ -1,0 +1,87 @@
+{
+  "retrieved": "2026-11-03",
+  "disclaimer": "Recreational and educational trainer. Not for operational aviation use. Confirm the current Czech AIP before any real flight.",
+  "geography": {
+    "source": "OpenStreetMap",
+    "license": "Open Database License (ODbL) 1.0",
+    "attribution": "© OpenStreetMap contributors",
+    "url": "https://www.openstreetmap.org/copyright",
+    "retrieved": "2026-11-03",
+    "method": "OSM API 0.6 map extract of the LKPR area, filtered to aeroway features and saved in data/lkpr_aeroway.geojson. Rebuild with scripts/build_lkpr_data.py.",
+    "simplified_or_unverified": [
+      "The diagram is drawn from OSM centre-lines and area outlines, not from the official aerodrome chart AD 2-LKPR-2-1.",
+      "OSM runway 06/24 centre-line length is about 3708 m. AIP AD 2.12 publishes 3715 m.",
+      "A 67 m taxiway link between A1 and Z has no ref and no name in OSM. The trainer does not invent a designator for it.",
+      "The holding point is an OSM node (holding_position:type=runway) on taxiway Z, about 131 m from the runway 06/24 centre-line. AIP AD 2.20.4.5 says a CAT I holding point for runway 24 is on taxiway Z. This trainer does not claim the OSM node is that surveyed coordinate.",
+      "Stand 3 coordinates are the OSM parking-position lead-in. AIP lists stand 3 among visual-docking stands but does not publish this coordinate.",
+      "Pushback is drawn along that lead-in line. No pushback facing was published for this scenario, so none is invented."
+    ]
+  },
+  "aip": {
+    "source": "Czech Aeronautical Information Publication, Václav Havel Airport Praha/Ruzyně, AD 2 LKPR",
+    "url": "https://aim.rlp.cz/eaip/html/eAIP/LK-AD-2.LKPR-en-GB.html",
+    "retrieved": "2026-11-03",
+    "runways": [
+      {"designator": "06/24", "dimension_m": "3715 x 45", "magnetic": "060° / 240°", "true": "065° / 245°", "reference": "AD 2.12"},
+      {"designator": "12/30", "dimension_m": "3250 x 45", "magnetic": "122° / 302°", "true": "127° / 307°", "reference": "AD 2.12"}
+    ],
+    "runway_preference_order": ["24", "06", "30", "12"],
+    "runway_preference_reference": "AD 2.21.2.1. The trainer uses runway 24 because it is first in that published order, not because of live wind or ATIS.",
+    "movement": "AD 2.20.2.3: instructions that direct aircraft movement are issued by RUZYNĚ GROUND or RUZYNĚ TOWER, depending on the hours in AD 2.18.",
+    "frequencies": [
+      {
+        "station": "RUZYNĚ DELIVERY",
+        "mhz": "120.060",
+        "hours": "0600–2100 local (0500–2000 UTC)",
+        "remarks": "English only. Outside these hours contact Ruzyně Tower 134.560. ATC clearance is also available as DCL via ACARS.",
+        "reference": "AD 2.18"
+      },
+      {
+        "station": "RUZYNĚ GROUND",
+        "mhz": "121.910",
+        "hours": "0600–2100 local (0500–2000 UTC)",
+        "remarks": "English only. Outside these hours contact Ruzyně Tower 134.560.",
+        "reference": "AD 2.18"
+      },
+      {
+        "station": "RUZYNĚ TOWER",
+        "mhz": "134.560",
+        "hours": "H24",
+        "remarks": "English only.",
+        "reference": "AD 2.18"
+      },
+      {
+        "station": "PRAHA RADAR",
+        "mhz": "120.530",
+        "hours": "H24",
+        "remarks": "Approach, departure aircraft.",
+        "reference": "AD 2.18"
+      },
+      {
+        "station": "PRAHA RADAR",
+        "mhz": "127.580",
+        "hours": "H24",
+        "remarks": "Approach, arrival aircraft. Not used by the departure scenario.",
+        "reference": "AD 2.18"
+      },
+      {
+        "station": "RUZYNĚ ATIS",
+        "mhz": "122.160",
+        "hours": "H24",
+        "remarks": "English broadcast. This trainer does not play live ATIS.",
+        "reference": "AD 2.18"
+      }
+    ]
+  },
+  "simulated": [
+    "QNH 1013 hPa is the standard-pressure training value. It is not a METAR, ATIS, or local QNH.",
+    "No ATIS information letter is simulated.",
+    "No SID, flight-planned route, squawk, or initial-climb altitude is issued. Those depend on the actual flight and are not invented here.",
+    "Callsign OK-ABC / Oscar Kilo Alfa Bravo Charlie is a fictional training registration.",
+    "The taxi instruction 'via Alfa one and Zulu' is a training clearance along one path in the OSM taxiway graph. It is not a published standard taxi route.",
+    "Calling Delivery for runway and QNH, then Ground for startup and pushback, is a simplified training flow. It is labeled as such and is not a transcript of local phraseology.",
+    "When the departure handoff is given, and the exact wording of each transmission, is training design based on ICAO-style readback practice.",
+    "Aircraft speed on the diagram is sped up so the exercise stays short. Apron speed limits in the AIP are not modelled."
+  ],
+  "phraseology": "Readback items follow the usual ICAO mandatory-readback set (runway, hold short, line up and wait, takeoff clearance, altimeter, frequency change). This is training design, not a local phraseology exam."
+}

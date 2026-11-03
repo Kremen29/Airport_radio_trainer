@@ -1,10 +1,11 @@
 /* Caches the page shell and the airport diagram. Scoring and transcription stay on the network. */
-const CACHE = "lkpr-trainer-v4";
+const CACHE = "lkpr-trainer-v5";
 const SHELL = [
   "/",
   "/manifest.webmanifest",
   "/static/css/app.css",
   "/static/js/app.js",
+  "/static/js/aircraft.js",
   "/static/js/map.js",
   "/static/js/radio.js",
   "/static/icons/icon-192.png",

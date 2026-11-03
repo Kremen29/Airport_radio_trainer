@@ -219,9 +219,40 @@ function render(view) {
   document.querySelector(".comms").classList.toggle("tx-you", false);
 }
 
+function pilotSentence(view) {
+  let text = view.example || "Nothing to say on this step.";
+  if (currentAircraft().type === "A380" && view.step === "request_delivery" && text.includes("Oscar Kilo Alfa Bravo Charlie") && !text.includes("Super")) {
+    text = text.replace("Oscar Kilo Alfa Bravo Charlie", "Oscar Kilo Alfa Bravo Charlie Super");
+  }
+  return text;
+}
+
+const PLAIN_WHY = {
+  request_delivery: "You are parked at the gate. Call Delivery. Say your callsign and ask to start the engines.",
+  readback_delivery: "Delivery told you the runway, the air pressure (QNH), and the next frequency. Repeat those items, then your callsign.",
+  request_ground: "Call Ground. This controller moves you on the taxiways. Ask for engine start and pushback.",
+  readback_startup_pushback: "Ground said you may start and push back. Repeat both clearances, then your callsign. The aircraft will not move until you do.",
+  readback_taxi: "Ground has cleared you to taxi. Read back the route and the hold-short, then your callsign. Hold short means stop before the runway.",
+  readback_hold: "You are at the holding point. Say again that you will stay off the runway, and read back the Tower frequency.",
+  readback_lineup: "Tower is letting you go onto the runway and wait. This is not permission to take off. Say line up and wait, the runway, and your callsign.",
+  readback_takeoff: "This is the separate permission to take off. Say cleared for takeoff, the runway, and your callsign.",
+  readback_radar: "Tower is sending you to the radar controller. Repeat who to call and the frequency.",
+};
+
 function renderHint(view) {
-  const sentence = view.example || "Nothing to say on this step.";
+  const sentence = pilotSentence(view);
   document.getElementById("hint-sentence").textContent = sentence;
+  const why = document.getElementById("hint-why");
+  if (why) why.textContent = PLAIN_WHY[view.step] || "";
+  const beginner = localStorage.getItem("lkpr-level") !== "pro";
+  const waiting = view.awaiting === "request" || view.awaiting === "readback";
+  if (beginner && waiting && !view.moving && view.example) {
+    document.getElementById("hint-panel").hidden = false;
+    if (!ui.typed.value || ui.typed.value === session.lastPrefill) {
+      ui.typed.value = sentence;
+      session.lastPrefill = sentence;
+    }
+  }
   const blocked = view.last_evaluation && view.last_evaluation.blocks_progress;
   const fix = document.getElementById("hint-fix");
   const list = document.getElementById("hint-gaps");
@@ -711,14 +742,14 @@ if (window.speechSynthesis) {
 const TUTORIAL = [
   {
     title: "Welcome",
-    body: "This is a practice radio for a departure from Prague, LKPR. You hear the controller, you answer, and the aircraft moves only after a correct readback. It is training, not a clearance for a real flight.",
-    speech: "Welcome. This is a practice radio for a departure from Prague. You hear the controller, you answer, and the aircraft moves only after a correct readback.",
+    body: "This is a practice radio for a departure from Prague Airport. The controller speaks. You answer. The aircraft moves only when your answer has the important parts. Beginner mode shows the words for you. Pro mode waits until you tap Hint.",
+    speech: "Welcome. This is a practice radio for a departure from Prague. Beginner mode shows the words for you. Pro mode waits until you tap Hint.",
     target: null,
   },
   {
     title: "Your aircraft",
-    body: "The map is Prague Airport. Callsign OK-ABC is parked at stand 3. The magenta line is the training taxi route toward runway 24. The aircraft stays off the runway until a later clearance.",
-    speech: "The map is Prague Airport. Oscar Kilo Alfa Bravo Charlie is parked at stand 3. The magenta line is the training taxi route.",
+    body: "You chose the aircraft on the start screen. You can change it later with the Aircraft button. The colours are made up. They are not a real airline. Callsign OK-ABC is parked at stand 3. The pink line is the practice taxi route.",
+    speech: "You chose the aircraft on the start screen. You can change it with the Aircraft button. The colours are made up. The aircraft is parked at stand 3.",
     target: ".map-wrap",
   },
   {
@@ -753,8 +784,8 @@ const TUTORIAL = [
   },
   {
     title: "Start the departure",
-    body: "You are at stand 3, ready to call Delivery. Tap Start scenario. The tutorial can be opened again from the Tutorial button, which also turns the iPhone speaker on.",
-    speech: "You are at stand 3, ready to call Delivery. Tap start scenario when you are ready.",
+    body: "Airport map lets you look around and tap a runway, taxiway, or stand to read what it is. Glossary explains the words. You are at stand 3, ready to call Delivery. Tap Start scenario.",
+    speech: "Airport map lets you look around and tap things to learn their names. You are at stand 3, ready to call Delivery.",
     target: null,
   },
 ];
@@ -819,6 +850,7 @@ function onTutorialBack() {
 
 function closeTutorial(markDone) {
   document.getElementById("tutorial").hidden = true;
+  if (!session.started) document.getElementById("setup").hidden = false;
   document.querySelectorAll(".tutorial-target").forEach((node) => node.classList.remove("tutorial-target"));
   radio.skip();
   if (markDone) localStorage.setItem("lkpr-tutorial-done", "1");
@@ -835,6 +867,165 @@ function syncSpeakerButton() {
   button.setAttribute("aria-pressed", radio.muted ? "false" : "true");
 }
 
+function currentAircraft() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("lkpr-aircraft") || "");
+    if (saved && AIRCRAFT_TYPES[saved.type]) return saved;
+  } catch (err) { /* use the default */ }
+  return { type: "A320", livery: defaultLivery("A320") };
+}
+
+function saveAircraft(data) {
+  localStorage.setItem("lkpr-aircraft", JSON.stringify(data));
+  map.setAircraftStyle(data);
+  paintPreview();
+}
+
+function paintPreview() {
+  const canvas = document.getElementById("aircraft-preview");
+  const note = document.getElementById("livery-note");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#e7efe4";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const data = currentAircraft();
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2 + 8);
+  drawAircraftIcon(ctx, 110, data.type, data.livery);
+  ctx.restore();
+  const spec = AIRCRAFT_TYPES[data.type];
+  note.textContent = `${spec.name}. ${spec.note} The colours are a made-up paint scheme, not a real airline.`;
+}
+
+function renderTypeGrid() {
+  const grid = document.getElementById("type-grid");
+  const selected = currentAircraft().type;
+  grid.innerHTML = "";
+  Object.keys(AIRCRAFT_TYPES).forEach((id) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `type-card${id === selected ? " active" : ""}`;
+    button.textContent = AIRCRAFT_TYPES[id].name;
+    button.addEventListener("click", () => {
+      const data = currentAircraft();
+      data.type = id;
+      data.livery = data.livery || defaultLivery(id);
+      saveAircraft(data);
+      renderTypeGrid();
+    });
+    grid.appendChild(button);
+  });
+}
+
+function setLevel(level) {
+  const pro = level === "pro";
+  localStorage.setItem("lkpr-level", pro ? "pro" : "beginner");
+  document.getElementById("level-beginner").classList.toggle("active", !pro);
+  document.getElementById("level-pro").classList.toggle("active", pro);
+  document.getElementById("level-blurb").textContent = pro
+    ? "Pro: the hint stays hidden until you tap Hint. You say or type the call yourself."
+    : "Beginner: before each call, the hint opens and the sentence is put in the text box. You can change the words before you send them.";
+}
+
+let setupAsSettings = false;
+
+function showSetup(asSettings) {
+  setupAsSettings = Boolean(asSettings);
+  document.getElementById("setup").hidden = false;
+  document.getElementById("setup-start").textContent = setupAsSettings ? "Done" : "Start scenario";
+  if (!localStorage.getItem("lkpr-aircraft")) saveAircraft({ type: "A320", livery: defaultLivery("A320") });
+  setLevel(localStorage.getItem("lkpr-level") === "pro" ? "pro" : "beginner");
+  renderTypeGrid();
+  paintPreview();
+  map.setAircraftStyle(currentAircraft());
+}
+
+function describeFeature(feature) {
+  const props = feature.properties || {};
+  if (props.aeroway === "runway") {
+    const name = props.ref || "with no name in the map data";
+    return `Runway ${name}. Aircraft take off and land here. The number is the compass direction divided by 10. Runway 24 means you face about 240 degrees, roughly south-west. Runway 06 is the other way, about 060 degrees.`;
+  }
+  if (props.aeroway === "taxiway") {
+    if (!props.ref) return "Unnamed taxiway. This is a road for aircraft, but the map data gives it no name. This trainer does not invent one.";
+    return `Taxiway ${props.ref}. A road for aircraft between the parking stands and the runway. The name comes from the map data.`;
+  }
+  if (props.aeroway === "parking_position") {
+    if (!props.ref) return "A parking stand with no number in the map data.";
+    return `Stand ${props.ref}. A parking spot for one aircraft, usually next to the terminal. This practice flight starts at stand 3.`;
+  }
+  if (props.aeroway === "terminal") {
+    return `${props.display_name || "Terminal"}. The building where passengers get on and off. The name comes from the map data.`;
+  }
+  if (props.aeroway === "holding_position") {
+    return "Holding point. You must stop here. Do not go onto the runway until the controller says you may.";
+  }
+  if (props.aeroway === "apron") {
+    return "Apron. The open paved area where aircraft park, start engines, and push back.";
+  }
+  return "This is part of the airport drawing. The map data does not give it a name.";
+}
+
+function enterExplore() {
+  document.getElementById("setup").hidden = true;
+  document.getElementById("map-popup").hidden = true;
+  map.explore = true;
+  map.setPen(false);
+  document.getElementById("explore-bar").hidden = false;
+  document.getElementById("legend").hidden = false;
+  map.draw();
+}
+
+function exitExplore() {
+  map.explore = false;
+  document.getElementById("explore-bar").hidden = true;
+  document.getElementById("map-popup").hidden = true;
+  map.draw();
+  if (!session.started) document.getElementById("setup").hidden = false;
+}
+
+session.started = false;
+document.getElementById("level-beginner").addEventListener("click", () => setLevel("beginner"));
+document.getElementById("level-pro").addEventListener("click", () => setLevel("pro"));
+document.getElementById("livery-shuffle").addEventListener("click", () => {
+  const data = currentAircraft();
+  data.livery = randomLivery();
+  saveAircraft(data);
+});
+document.getElementById("setup-start").addEventListener("click", () => {
+  radio.unlock();
+  document.getElementById("setup").hidden = true;
+  const settings = setupAsSettings;
+  session.started = true;
+  map.setAircraftStyle(currentAircraft());
+  if (session.view) render(session.view);
+  if (!settings && !localStorage.getItem("lkpr-tutorial-done")) openTutorial();
+});
+document.getElementById("setup-explore").addEventListener("click", () => enterExplore());
+document.getElementById("setup-tutorial").addEventListener("click", () => {
+  radio.unlock();
+  document.getElementById("setup").hidden = true;
+  openTutorial();
+});
+document.getElementById("aircraft-open").addEventListener("click", () => showSetup(true));
+document.getElementById("map-open").addEventListener("click", () => enterExplore());
+document.getElementById("explore-exit").addEventListener("click", () => exitExplore());
+document.getElementById("glossary-open").addEventListener("click", () => {
+  document.getElementById("glossary-dialog").showModal();
+});
+document.getElementById("map-popup-close").addEventListener("click", () => {
+  document.getElementById("map-popup").hidden = true;
+});
+document.getElementById("legend-toggle").addEventListener("click", () => {
+  const legend = document.getElementById("legend");
+  legend.hidden = !legend.hidden;
+});
+map.onPick = (feature) => {
+  document.getElementById("map-popup-text").textContent = describeFeature(feature);
+  document.getElementById("map-popup").hidden = false;
+};
+
 boot();
-if (!localStorage.getItem("lkpr-tutorial-done")) openTutorial();
 syncSpeakerButton();
+showSetup(false);

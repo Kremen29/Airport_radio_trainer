@@ -25,6 +25,9 @@ class AirportMap {
     this._labels = [];
     this.onFollowChange = null;
     this.pen = false;
+    this.explore = false;
+    this.onPick = null;
+    this._down = null;
     this.userPoints = [];
     this.userRunway = false;
     this._drawingStroke = false;
@@ -191,7 +194,16 @@ class AirportMap {
   drawFeature(feature) {
     const kind = feature.properties.aeroway;
     const ctx = this.ctx;
-    if (feature.geometry.type === "Point") return;
+    if (feature.geometry.type === "Point") {
+      if (this.explore && feature.properties.aeroway === "holding_position" && this.metersPerPx() < 6) {
+        const pair = feature.geometry.coordinates;
+        const screen = this.toScreen(pair[1], pair[0]);
+        ctx.fillStyle = "#c4126b";
+        ctx.fillRect(screen.x - 3, screen.y - 3, 6, 6);
+        this._labels.push({ x: screen.x, y: screen.y - 10, text: "Hold", strong: Boolean(feature.properties.trainer_hold) });
+      }
+      return;
+    }
     const rings = feature.geometry.type === "Polygon" ? feature.geometry.coordinates : [feature.geometry.coordinates];
     rings.forEach((ring) => {
       if (ring.length < 2) return;
@@ -231,14 +243,18 @@ class AirportMap {
         ctx.stroke();
       }
     });
-    if (kind === "taxiway" && feature.properties.ref && this.metersPerPx() < 5) {
+    const labelZoom = this.explore ? 14 : 5;
+    if (kind === "taxiway" && feature.properties.ref && this.metersPerPx() < labelZoom) {
       this.queueLineLabel(feature.geometry.coordinates, feature.properties.ref, false);
     }
-    if (kind === "terminal" && feature.properties.display_name) {
-      this.queueCentroid(feature, feature.properties.display_name);
+    if (kind === "taxiway" && !feature.properties.ref && this.explore && this.metersPerPx() < 2.2) {
+      this.queueLineLabel(feature.geometry.coordinates, "unnamed", false);
     }
-    if (kind === "parking_position" && feature.properties.ref === this.route.stand.ref) {
-      this.queueLineLabel(feature.geometry.coordinates, "Stand " + feature.properties.ref, true);
+    if (kind === "terminal" && (feature.properties.display_name || this.explore)) {
+      this.queueCentroid(feature, feature.properties.display_name || "Terminal");
+    }
+    if (kind === "parking_position" && feature.properties.ref && (feature.properties.ref === this.route.stand.ref || (this.explore && this.metersPerPx() < 3))) {
+      this.queueLineLabel(feature.geometry.coordinates, "Stand " + feature.properties.ref, feature.properties.ref === this.route.stand.ref);
     }
   }
 
@@ -293,6 +309,46 @@ class AirportMap {
     this.pen = Boolean(on);
     this.canvas.style.cursor = this.pen ? "crosshair" : "grab";
     this.canvas.parentElement.classList.toggle("pen-on", this.pen);
+  }
+
+  hitTest(sx, sy) {
+    let best = null;
+    let bestDistance = 26;
+    this.features.forEach((feature) => {
+      const distance = this.featureScreenDistance(feature, sx, sy);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = feature;
+      }
+    });
+    return best;
+  }
+
+  featureScreenDistance(feature, sx, sy) {
+    const geom = feature.geometry;
+    if (!geom) return 1e9;
+    if (geom.type === "Point") {
+      const screen = this.toScreen(geom.coordinates[1], geom.coordinates[0]);
+      return Math.hypot(screen.x - sx, screen.y - sy);
+    }
+    const lines = geom.type === "Polygon" ? geom.coordinates : [geom.coordinates];
+    let best = 1e9;
+    lines.forEach((line) => {
+      for (let index = 1; index < line.length; index += 1) {
+        const a = this.toScreen(line[index - 1][1], line[index - 1][0]);
+        const b = this.toScreen(line[index][1], line[index][0]);
+        best = Math.min(best, this.distToSeg(sx, sy, a.x, a.y, b.x, b.y));
+      }
+    });
+    return best;
+  }
+
+  distToSeg(px, py, ax, ay, bx, by) {
+    const vx = bx - ax;
+    const vy = by - ay;
+    const length = vx * vx + vy * vy;
+    const t = length === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / length));
+    return Math.hypot(px - (ax + vx * t), py - (ay + vy * t));
   }
 
   screenToLonLat(sx, sy) {
@@ -383,26 +439,22 @@ class AirportMap {
 
   drawAircraft() {
     const screen = this.toScreen(this.aircraft.lat, this.aircraft.lon);
+    const type = (this.aircraftStyle && this.aircraftStyle.type) || "A320";
+    const spec = (typeof AIRCRAFT_TYPES !== "undefined" && AIRCRAFT_TYPES[type]) || { span: 36 };
+    const spanPx = Math.max(26, Math.min(150, this.metersToPx(spec.span)));
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(screen.x, screen.y);
-    ctx.beginPath();
-    ctx.arc(0, 0, 16, 0, Math.PI * 2);
-    ctx.fillStyle = "#fbf6ee";
-    ctx.strokeStyle = "#1b2740";
-    ctx.lineWidth = 1.5;
-    ctx.fill();
-    ctx.stroke();
     ctx.rotate(this.aircraft.heading * Math.PI / 180);
-    ctx.beginPath();
-    ctx.moveTo(0, -13);
-    ctx.lineTo(7, 11);
-    ctx.lineTo(0, 5);
-    ctx.lineTo(-7, 11);
-    ctx.closePath();
-    ctx.fillStyle = "#c4126b";
-    ctx.fill();
+    if (typeof drawAircraftIcon === "function") {
+      drawAircraftIcon(ctx, spanPx, type, this.aircraftStyle && this.aircraftStyle.livery);
+    }
     ctx.restore();
+  }
+
+  setAircraftStyle(style) {
+    this.aircraftStyle = style;
+    if (this.ready) this.draw();
   }
 
   queueLineLabel(coords, text, strong) {
@@ -580,6 +632,7 @@ class AirportMap {
 
     canvas.addEventListener("pointerdown", (event) => {
       canvas.setPointerCapture(event.pointerId);
+      this._down = { x: event.offsetX, y: event.offsetY };
       if (this.pen) {
         event.preventDefault();
         this._drawingStroke = true;
@@ -623,9 +676,15 @@ class AirportMap {
       }
     });
     const end = (event) => {
+      const start = this._down;
+      const moved = start ? Math.hypot(event.offsetX - start.x, event.offsetY - start.y) : 99;
       this._drawingStroke = false;
       this._pointers.delete(event.pointerId);
       if (this._pointers.size < 2) this._pinch = null;
+      if (!this.pen && this.explore && moved < 8 && this.onPick) {
+        const feature = this.hitTest(event.offsetX, event.offsetY);
+        if (feature) this.onPick(feature);
+      }
     };
     canvas.addEventListener("touchmove", (event) => {
       if (this.pen) event.preventDefault();

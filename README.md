@@ -173,6 +173,14 @@ Every ATC transmission is read aloud and also shown as text. The Repeat button r
 
 Auto on iPhone first tries Safari recognition. The words appear in the field, you check them, and tap Send. If Safari does not allow the microphone and faster-whisper is on the server, the next press records. On Render without whisper, typing remains. On a computer, the sentence is sent automatically when you release the button, as before.
 
+### Beginners, the aircraft, and the airport map
+
+The start screen asks you to pick Beginner or Pro, and an aircraft. Beginner opens the hint before each call and puts the sentence in the text box. Pro hides the hint until you tap Hint. The Aircraft button changes the choice later. The colours are a made-up paint scheme, not a real airline.
+
+The Airbus A380 is drawn with four engines. On a real first radio call, pilots of an A380 say Super after the callsign. Super warns other pilots about the strong swirling air behind a very large aircraft. The hint adds that word for an A380. The score does not require it. The callsign stays OK-ABC.
+
+Airport map lets you pan and zoom, and tap a runway, taxiway, stand, terminal, or holding point. The words are plain explanations. If the map data has no name, the popup says it is unnamed. Glossary lists the radio words used in the lesson, including the phonetic alphabet and the special number words tree, fife, niner, and decimal.
+
 ### Hint and drawing the taxi route
 
 Hint is always on the radio panel. It shows the full sentence expected right now, with the full callsign, for both the first call and a readback. After a wrong readback it also lists what was missing or incorrect and the corrected sentence, so you are not stuck. Use this copies that sentence into the text box. Hear hint speaks it. Using a hint is counted on the score and never blocks the aircraft.

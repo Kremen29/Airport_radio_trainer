@@ -21,6 +21,9 @@
       <p class="brand-name">LKPR <span>Radio trainer</span></p>
     </div>
     <nav id="phase-nav" class="phases" aria-label="Flight phase"></nav>
+    <button id="aircraft-open" class="text-button" type="button">Aircraft</button>
+    <button id="map-open" class="text-button" type="button">Airport map</button>
+    <button id="glossary-open" class="text-button" type="button">Glossary</button>
     <button id="tutorial-open" class="text-button" type="button">Tutorial</button>
     <button id="sources-open" class="text-button" type="button">Sources</button>
   </header>
@@ -44,7 +47,8 @@
         <button id="fit" type="button">Fit</button>
         <button id="follow" type="button" aria-pressed="false">Follow</button>
       </div>
-      <ul class="legend">
+      <button id="legend-toggle" class="text-button map-legend-toggle" type="button">Legend</button>
+      <ul id="legend" class="legend">
         <li><i class="swatch runway"></i>Runway</li>
         <li><i class="swatch taxi"></i>Taxiway</li>
         <li><i class="swatch route"></i>Training route</li>
@@ -52,6 +56,14 @@
       </ul>
       <p class="map-credit">Map data © OpenStreetMap contributors, ODbL. Not an official aerodrome chart.</p>
       <p id="banner" class="banner" hidden></p>
+      <div id="explore-bar" class="explore-bar" hidden>
+        <p>You are only looking around. This does not move the aircraft or call the controller.</p>
+        <button id="explore-exit" type="button">Back</button>
+      </div>
+      <div id="map-popup" class="map-popup" hidden>
+        <p id="map-popup-text"></p>
+        <button id="map-popup-close" class="text-button" type="button">Close</button>
+      </div>
     </div>
 
     <section class="comms" aria-label="Radio">
@@ -71,6 +83,7 @@
 
       <section id="hint-panel" class="hint-panel" hidden>
         <h3>Say this</h3>
+        <p id="hint-why" class="support"></p>
         <p id="hint-sentence" class="hint-sentence"></p>
         <div id="hint-fix" hidden>
           <h3>Fix these</h3>
@@ -150,6 +163,30 @@
     </section>
   </main>
 
+  <div id="setup" class="setup">
+    <div class="setup-card">
+      <p class="speaker-kicker">Prague Airport</p>
+      <h2>Practise talking to air traffic control</h2>
+      <p>You are the pilot of a practice flight. A controller speaks. You answer. The aircraft moves only when your answer includes the important parts.</p>
+      <h3>How much help?</h3>
+      <div class="choice-row">
+        <button id="level-beginner" class="choice" type="button">Beginner</button>
+        <button id="level-pro" class="choice" type="button">Pro</button>
+      </div>
+      <p id="level-blurb"></p>
+      <h3>Pick an aircraft</h3>
+      <div id="type-grid" class="type-grid"></div>
+      <canvas id="aircraft-preview" width="320" height="140" aria-label="Aircraft preview"></canvas>
+      <p id="livery-note"></p>
+      <button id="livery-shuffle" class="text-button" type="button">New colours</button>
+      <div class="setup-actions">
+        <button id="setup-explore" class="text-button" type="button">Explore the airport</button>
+        <button id="setup-tutorial" class="text-button" type="button">Tutorial</button>
+        <button id="setup-start" type="button">Start scenario</button>
+      </div>
+    </div>
+  </div>
+
   <div id="tutorial" class="tutorial" hidden>
     <section class="tutorial-card" role="dialog" aria-labelledby="tutorial-title">
       <p id="tutorial-count" class="speaker-kicker">Tutorial</p>
@@ -162,6 +199,30 @@
       </div>
     </section>
   </div>
+
+  <dialog id="glossary-dialog">
+    <form method="dialog">
+      <header>
+        <h2>Words you will hear</h2>
+        <button value="cancel" class="text-button" type="submit">Close</button>
+      </header>
+      <dl class="glossary">
+        <dt>Delivery</dt><dd>The controller you call first at the gate. They tell you the runway and the air-pressure setting, then send you to Ground.</dd>
+        <dt>Ground</dt><dd>The controller who moves aircraft on the taxiways. Taxiways are the roads between the parking stand and the runway.</dd>
+        <dt>Tower</dt><dd>The controller who looks after the runway. Only Tower can let you go onto the runway or take off.</dd>
+        <dt>Radar</dt><dd>The controller you call after takeoff. At Prague the call is Praha Radar. They watch aircraft in the air.</dd>
+        <dt>Readback</dt><dd>You repeat the important parts of an instruction, so the controller knows you heard them. End with your callsign, the aircraft's name on the radio.</dd>
+        <dt>QNH</dt><dd>The air pressure setting. Pilots put it in the altimeter so height is measured above the sea. Say the digits one by one.</dd>
+        <dt>Squawk</dt><dd>A four-digit code for the radar box in the aircraft. This practice flight does not use one, so you will not hear it.</dd>
+        <dt>Hold short</dt><dd>Stop before the runway and stay there. Do not roll onto the runway.</dd>
+        <dt>Line up and wait</dt><dd>You may go onto the runway and face the takeoff direction. Then stop. It is not permission to take off.</dd>
+        <dt>Cleared for takeoff</dt><dd>You may start the takeoff roll. This is a separate instruction from line up and wait.</dd>
+        <dt>Super</dt><dd>A word used on the first call for the largest aircraft, such as the A380. It warns others about strong swirling air behind the aircraft. The score does not require it.</dd>
+        <dt>Phonetic alphabet</dt><dd>Letters are spoken as words so they are not confused. Alfa, Bravo, Charlie, Delta, Echo, Foxtrot, Golf, Hotel, India, Juliett, Kilo, Lima, Mike, November, Oscar, Papa, Quebec, Romeo, Sierra, Tango, Uniform, Victor, Whiskey, X-ray, Yankee, Zulu.</dd>
+        <dt>Numbers</dt><dd>Say each digit. Some have a special radio form: 3 is tree, 5 is fife, 9 is niner. The decimal point in a frequency is decimal. Runway 24 is two four, not twenty-four.</dd>
+      </dl>
+    </form>
+  </dialog>
 
   <dialog id="sources-dialog">
     <form method="dialog">
@@ -183,6 +244,7 @@
     </form>
   </dialog>
 
+  <script src="/static/js/aircraft.js"></script>
   <script src="/static/js/map.js"></script>
   <script src="/static/js/radio.js"></script>
   <script src="/static/js/app.js"></script>
